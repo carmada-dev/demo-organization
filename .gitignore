@@ -1,0 +1,6 @@
+deploy.json
+organization.json
+projects.json
+project-*.json
+
+images/*/image.pkr.log
