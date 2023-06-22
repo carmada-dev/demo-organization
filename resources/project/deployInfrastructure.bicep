@@ -57,8 +57,12 @@ resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-07-01' = i
   }
 }
 
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
+  name: ProjectDefinition.name
+}
+
 module deployInfrastructure_DNS 'deployInfrastructure_DNS.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployInfrastructure_DNS')}'
+  name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployInfrastructure_DNS')}'
   params: {
     InitialDeployment: InitialDeployment
     OrganizationContext: OrganizationContext
@@ -68,7 +72,7 @@ module deployInfrastructure_DNS 'deployInfrastructure_DNS.bicep' = {
 }
 
 module deployInfrastructure_NVA 'deployInfrastructure_NVA.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployInfrastructure_NVA')}'
+  name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployInfrastructure_NVA')}'
   params: {
     InitialDeployment: InitialDeployment
     OrganizationContext: OrganizationContext
@@ -76,3 +80,8 @@ module deployInfrastructure_NVA 'deployInfrastructure_NVA.bicep' = {
     ProjectDefinition: ProjectDefinition
   }
 }
+
+// ============================================================================================
+
+output NetworkId string = InitialDeployment ? virtualNetworkCreate.id : virtualNetwork.id
+output GatewayIP string = deployInfrastructure_NVA.outputs.GatewayIP

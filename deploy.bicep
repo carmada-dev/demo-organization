@@ -16,70 +16,42 @@ var DeploymentContext = {
   } 
 }
 
+var EnvironmentMaps = flatten(map(range(0, length(ProjectDefinitions)), pdi => map(range(0, length(ProjectDefinitions[pdi].environments)), evi => {
+  ProjectDefinitionIndex: pdi
+  ProjectDefinition: ProjectDefinitions[pdi]
+  EnvironmentDefinitionIndex: evi
+  EnvironmentDefinition: ProjectDefinitions[pdi].environments[evi]
+})))
+
 // ============================================================================================
 
-
-// Deploy Organization
-// --------------------------------------------------------------------------------------------
-
-resource organizationResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: 'ORG-${OrganizationDefinition.name}'
-  location: OrganizationDefinition.location
-}
-
-resource organizationResourceGroupPrivateLink 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: 'ORG-${OrganizationDefinition.name}-PL'
-  location: OrganizationDefinition.location
-}
-
-module testOrganizationNetworkExists 'resources/tools/testResourceExists.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'testOrganizationNetworkExists')}'
-  scope: organizationResourceGroup
+module deployOrganization 'resources/deployOrganization.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployOrganization')}'
   params: {
-    ResourceName: OrganizationDefinition.name
-    ResourceType: 'Microsoft.Network/virtualNetworks'
-  }
-}
-
-module organizationInfrastructure 'resources/organization/deployInfrastructure.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition))}'
-  scope: organizationResourceGroup
-  params: {
+    DeploymentContext: DeploymentContext
     OrganizationDefinition: OrganizationDefinition
-    InitialDeployment: !testOrganizationNetworkExists.outputs.ResourceExists
   }
 }
 
-
-// Deploy Project/s
-// --------------------------------------------------------------------------------------------
-
-resource projectResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = [for ProjectDefinition in ProjectDefinitions: {
-  name: 'PRJ-${ProjectDefinition.name}'
-  location: OrganizationDefinition.location
-}]
-
-resource projectResourceGroupPrivateLink 'Microsoft.Resources/resourceGroups@2022-09-01' = [for ProjectDefinition in ProjectDefinitions: {
-  name: 'PRJ-${ProjectDefinition.name}-PL'
-  location: OrganizationDefinition.location
-}]
-
-module testProjectNetworkExists 'resources/tools/testResourceExists.bicep' = [for (ProjectDefinition, ProjectIndex) in ProjectDefinitions: {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'testProjectNetworkExists')}'
-  scope: projectResourceGroup[ProjectIndex]
+module deployProject 'resources/deployProject.bicep' = [for ProjectDefinition in ProjectDefinitions: {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployProject')}'
   params: {
-    ResourceName: ProjectDefinition.name
-    ResourceType: 'Microsoft.Network/virtualNetworks'
-  }
-}]
-
-module projectInfrastructure 'resources/project/deployInfrastructure.bicep'= [for (ProjectDefinition, ProjectIndex) in ProjectDefinitions: {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition))}'
-  scope: projectResourceGroup[ProjectIndex]
-  params: {
+    DeploymentContext: DeploymentContext
     OrganizationDefinition: OrganizationDefinition
+    OrganizationContext: deployOrganization.outputs.OrganizationContext
     ProjectDefinition: ProjectDefinition
-    InitialDeployment: !testProjectNetworkExists[ProjectIndex].outputs.ResourceExists
   }
 }]
 
+
+module deployEnvironment 'resources/deployEnvironment.bicep' = [for EnvironmentMap in EnvironmentMaps: {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(EnvironmentMap))}'
+  scope: subscription(EnvironmentMap.EnvironmentDefinition.subscription)
+  params: {
+    OrganizationDefinition: OrganizationDefinition
+    OrganizationContext: deployOrganization.outputs.OrganizationContext
+    ProjectDefinition: EnvironmentMap.ProjectDefinition
+    ProjectContext: deployProject[EnvironmentMap.ProjectDefinitionIndex].outputs.ProjectContext
+    EnvironmentDefinition: EnvironmentMap.EnvironmentDefinition
+  }
+}]

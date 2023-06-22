@@ -220,25 +220,9 @@ resource gateway 'Microsoft.Compute/virtualMachines@2021-11-01' = {
   }
 }
 
-resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
-}
-
-resource contributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(vnet.id, contributorRoleDefinition.id, gateway.id)
-  properties: {
-    principalId: gateway.identity.principalId
-    roleDefinitionId: contributorRoleDefinition.id
-    principalType: 'ServicePrincipal'
-  }
-}
-
 resource gatewayInit 'Microsoft.Compute/virtualMachines/extensions@2022-08-01' = {
   name: 'Init'
   location: OrganizationDefinition.location
-  dependsOn: [
-    contributorRoleAssignment
-  ]
   parent: gateway
   properties: {
     publisher: 'Microsoft.Azure.Extensions'
