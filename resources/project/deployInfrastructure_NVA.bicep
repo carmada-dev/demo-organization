@@ -40,7 +40,7 @@ var WireguardArguments = join([
   join(map(WireguardDefinition.devices, device => '-d \'${first(split(device, '/'))}\''), ' ')      // Device Address (list of Device IPAddress)
 ], ' ')
 
-var InitScriptsBaseUri = 'https://raw.githubusercontent.com/markusheiliger/dev-box-demo/main/resources/project/scripts/'
+var InitScriptsBaseUri = 'https://raw.githubusercontent.com/carmada-dev/demo-organization/main/resources/project/scripts/'
 var InitScriptNames = [ 'initMachine.sh', 'setupDnsForwarder.sh', 'setupNetForwarder.sh', 'setupWireGuard.sh' ]
 var InitCommand = join(filter([
   './initMachine.sh'
