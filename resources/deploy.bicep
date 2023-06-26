@@ -46,9 +46,13 @@ module deployProject './deployProject.bicep' = [for ProjectDefinition in Project
 // the core infrastructure for the passed in organization and projects definitions passed in
 // should now be ready now and we can start deploying platform engineering related resources
 // like the DevCenter and related DevProjects.
- 
+
 module deployDevCenter './deployDevCenter.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployDevCenter')}'
+  dependsOn: [
+    deployOrganization
+    deployProject
+  ]
   params: {
     DeploymentContext: DeploymentContext
     OrganizationDefinition: OrganizationDefinition
@@ -58,6 +62,10 @@ module deployDevCenter './deployDevCenter.bicep' = {
 
 module deployDevProject './deployDevProject.bicep' = [for (ProjectDefinition, ProjectDefinitionIndex) in ProjectDefinitions: {
   name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployDevProject')}'
+  dependsOn: [
+    deployOrganization
+    deployProject
+  ]
   params: {
     DeploymentContext: DeploymentContext
     OrganizationDefinition: OrganizationDefinition

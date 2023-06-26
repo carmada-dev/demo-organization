@@ -12,8 +12,6 @@ param SpokeNetworkIds array
 
 param SpokePeeringPrefix string = 'spoke'
 
-param UpdateIPGroups bool = false
-
 param OperationId string = newGuid()
 
 // ============================================================================================
@@ -49,14 +47,3 @@ module peerSpoke2Hub 'peerNetwork.bicep' = [for i in range(0, length(SpokeNetwor
   }
 }]
 
-module updateIPGroups 'deployIPGroups.bicep' = if (UpdateIPGroups) {
-  name: '${take(deployment().name, 36)}_${uniqueString('updateIPGroups', HubNetworkId, OperationId)}'
-  scope: resourceGroup(split(HubNetworkId, '/')[2], split(HubNetworkId, '/')[4])
-  dependsOn: [
-    peerHub2Spoke
-    peerSpoke2Hub
-  ]
-  params: {
-    VNetName: hubNetwork.name
-  }
-}

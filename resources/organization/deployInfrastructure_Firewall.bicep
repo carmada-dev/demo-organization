@@ -240,7 +240,7 @@ resource firewallSnet 'Microsoft.Network/virtualNetworks/subnets@2022-07-01' exi
 module deployIPGroups '../tools/deployIPGroups.bicep' = {
   name: '${take(deployment().name, 36)}_deployIPGroups'
   params: {
-    VNetName: virtualNetwork.name
+    VirtualNetworkName: virtualNetwork.name
     InitialDeployment: InitialDeployment
   }
 }

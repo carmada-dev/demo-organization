@@ -3,20 +3,20 @@ targetScope = 'resourceGroup'
 
 // ============================================================================================
 
-param VNetName string
+param VirtualNetworkName string
 param InitialDeployment bool = false
 
 // ============================================================================================
 
-var ResourcePrefix = '${vnet.name}-IPG'
+var ResourcePrefix = '${virtualNetwork.name}-IPG'
 
 var IPGroupSuffixes = [ 'project' ]
 var IPGroupHashTag = 'IPGroupHash'
 
 // ============================================================================================
 
-resource vnet 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
-  name: VNetName
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
+  name: VirtualNetworkName
 }
 
 module ipGroupLocalExists 'testResourceExists.bicep' = {
@@ -32,14 +32,14 @@ module ipGroupLocalDeploy 'deployIPGroup.bicep' = {
   params: {
     IPGroupName: '${ResourcePrefix}-LOCAL'
     IPGroupHash: (ipGroupLocalExists.outputs.ResourceExists && contains(ipGroupLocalExists.outputs.ResourceTags, IPGroupHashTag)) ? ipGroupLocalExists.outputs.ResourceTags[IPGroupHashTag] : ''
-    IPAddresses: sort(vnet.properties.addressSpace.addressPrefixes, (ip1, ip2) => ip1 < ip2)    
+    IPAddresses: sort(virtualNetwork.properties.addressSpace.addressPrefixes, (ip1, ip2) => ip1 < ip2)    
   }
 }
 
 module ipGroupPeeredExists 'testResourceExists.bicep' = [for suffix in IPGroupSuffixes : {
   name: '${take(deployment().name, 36)}_${uniqueString(suffix)}'
   params: {
-    ResourceName: '${ResourcePrefix}-LOCAL'
+    ResourceName: '${ResourcePrefix}-${toUpper(suffix)}'
     ResourceType: 'Microsoft.Network/ipGroups'
   }
 }]
@@ -52,7 +52,7 @@ module ipGroupPeeredDeployParallel 'deployIPGroup.bicep' = [for (suffix, index) 
   params: {
     IPGroupName: '${ResourcePrefix}-${toUpper(suffix)}'
     IPGroupHash: (ipGroupPeeredExists[index].outputs.ResourceExists && contains(ipGroupPeeredExists[index].outputs.ResourceTags, IPGroupHashTag)) ? ipGroupPeeredExists[index].outputs.ResourceTags[IPGroupHashTag] : ''
-    IPAddresses: sort(flatten(map(filter(vnet.properties.virtualNetworkPeerings, peer => toUpper(split(peer.name, '-')[0]) == toUpper(suffix)), peer => peer.properties.remoteVirtualNetworkAddressSpace.addressPrefixes)), (ip1, ip2) => ip1 < ip2)
+    IPAddresses: sort(flatten(map(filter(virtualNetwork.properties.virtualNetworkPeerings, peer => toUpper(split(peer.name, '-')[0]) == toUpper(suffix)), peer => peer.properties.remoteVirtualNetworkAddressSpace.addressPrefixes)), (ip1, ip2) => ip1 < ip2)
   }
 }]
 
@@ -65,7 +65,7 @@ module ipGroupPeeredDeploySequential 'deployIPGroup.bicep' = [for (suffix, index
   params: {
     IPGroupName: '${ResourcePrefix}-${toUpper(suffix)}'
     IPGroupHash: (ipGroupPeeredExists[index].outputs.ResourceExists && contains(ipGroupPeeredExists[index].outputs.ResourceTags, IPGroupHashTag)) ? ipGroupPeeredExists[index].outputs.ResourceTags[IPGroupHashTag] : ''
-    IPAddresses: sort(flatten(map(filter(vnet.properties.virtualNetworkPeerings, peer => toUpper(split(peer.name, '-')[0]) == toUpper(suffix)), peer => peer.properties.remoteVirtualNetworkAddressSpace.addressPrefixes)), (ip1, ip2) => ip1 < ip2)
+    IPAddresses: sort(flatten(map(filter(virtualNetwork.properties.virtualNetworkPeerings, peer => toUpper(split(peer.name, '-')[0]) == toUpper(suffix)), peer => peer.properties.remoteVirtualNetworkAddressSpace.addressPrefixes)), (ip1, ip2) => ip1 < ip2)
   }
 }]
 
