@@ -37,3 +37,9 @@ module deployEnvironmentInfrastructure 'environment/deployInfrastructure.bicep' 
   }
 }
 
+// ============================================================================================
+
+output EnvironmentContext object = {
+  ResourceGroupId: resourceGroup.id
+  NetworkId: deployEnvironmentInfrastructure.outputs.NetworkId
+}

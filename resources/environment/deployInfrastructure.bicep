@@ -30,7 +30,7 @@ resource defaultRoute 'Microsoft.Network/routeTables/routes@2022-07-01' = {
   }
 }
 
-resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-07-01' = if (InitialDeployment) {
+resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-11-01' = if (InitialDeployment) {
   name: ResourceName
   location: OrganizationDefinition.location
   properties: {
@@ -59,6 +59,21 @@ resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-07-01' = i
   }
 }
 
+module virtualNetworkPeer '../tools/peerNetworks.bicep' = if (InitialDeployment) {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(EnvironmentDefinition), 'virtualNetworkPeer')}'
+  scope: subscription()
+  params: {
+    HubNetworkId: ProjectContext.NetworkId
+    HubPeeringPrefix: 'project'
+    HubGatewayIP: ProjectContext.GatewayIP
+    SpokeNetworkIds: [ virtualNetworkCreate.id ]
+    SpokePeeringPrefix: 'environment'
+  }
+}
+
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-11-01' existing = {
+  name: ResourceName
+}
 module deployEnvironmentInfrastructure_DNS './deployInfrastructure_DNS.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString(string(EnvironmentDefinition), 'deployEnvironmentInfrastructure_DNS')}'
   dependsOn: [
@@ -76,3 +91,4 @@ module deployEnvironmentInfrastructure_DNS './deployInfrastructure_DNS.bicep' = 
 
 // ============================================================================================
 
+output NetworkId string = InitialDeployment ? virtualNetworkCreate.id : virtualNetwork.id

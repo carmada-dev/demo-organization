@@ -259,14 +259,14 @@ done
 echo '... done'
 
 displayHeader "Transpile template"
-az bicep build --file ./resources/main.bicep --stdout > ./deploy.json
+az bicep build --file ./resources/deploy.bicep --stdout > ./deploy.json
 echo "Target file: ./deploy.json"
 
 displayHeader "Run deployment"
 az deployment sub create \
 	--name $(uuidgen) \
 	--location $(jq --raw-output .location $ORGANIZATION) \
-	--template-file ./deploy.bicep \
+	--template-file ./resources/deploy.bicep \
 	--only-show-errors \
 	--parameters \
 		OrganizationDefinition=@$ORGANIZATION \

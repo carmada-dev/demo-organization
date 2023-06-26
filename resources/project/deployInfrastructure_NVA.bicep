@@ -40,7 +40,7 @@ var WireguardArguments = join([
   join(map(WireguardDefinition.devices, device => '-d \'${first(split(device, '/'))}\''), ' ')      // Device Address (list of Device IPAddress)
 ], ' ')
 
-var InitScriptsBaseUri = 'https://raw.githubusercontent.com/carmada-dev/demo-organization/main/resources/project/scripts/'
+var InitScriptBaseUri = 'https://raw.githubusercontent.com/carmada-dev/demo-organization/main/resources/project/scripts/'
 var InitScriptNames = [ 'initMachine.sh', 'setupDnsForwarder.sh', 'setupNetForwarder.sh', 'setupWireGuard.sh' ]
 var InitCommand = join(filter([
   './initMachine.sh'
@@ -231,7 +231,7 @@ resource gatewayInit 'Microsoft.Compute/virtualMachines/extensions@2022-08-01' =
     forceUpdateTag: guid(deployment().name)
     autoUpgradeMinorVersion: true
     settings: {      
-      fileUris: map(InitScriptNames, name => uri(InitScriptsBaseUri, name))
+      fileUris: map(InitScriptNames, name => uri(InitScriptBaseUri, name))
       commandToExecute: InitCommand
     }
   }

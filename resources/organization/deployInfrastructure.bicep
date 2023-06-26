@@ -68,6 +68,10 @@ resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-07-01' = i
   }  
 }
 
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
+  name: OrganizationDefinition.name
+}
+
 resource vnet 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
   name: OrganizationDefinition.name
 }
@@ -111,5 +115,6 @@ module deployInfrastructure_Firewall 'deployInfrastructure_Firewall.bicep' = {
 // ============================================================================================
 
 output WorkspaceId string = workspace.id
+output NetworkId string = InitialDeployment ? virtualNetworkCreate.id : virtualNetwork.id
 output GatewayIP string = deployInfrastructure_Firewall.outputs.GatewayIP
 

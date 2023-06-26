@@ -57,12 +57,27 @@ resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-07-01' = i
   }
 }
 
+module virtualNetworkPeer '../tools/peerNetworks.bicep' = if (InitialDeployment) {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'virtualNetworkPeer')}'
+  scope: subscription()
+  params: {
+    HubNetworkId: OrganizationContext.NetworkId
+    HubPeeringPrefix: 'organization'
+    HubGatewayIP: OrganizationContext.GatewayIP
+    SpokeNetworkIds: [ virtualNetworkCreate.id ]        
+    SpokePeeringPrefix: 'project'
+  }
+}
+
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
   name: ProjectDefinition.name
 }
 
 module deployInfrastructure_DNS 'deployInfrastructure_DNS.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployInfrastructure_DNS')}'
+  dependsOn: [
+    virtualNetworkCreate
+  ]
   params: {
     InitialDeployment: InitialDeployment
     OrganizationContext: OrganizationContext
@@ -73,6 +88,9 @@ module deployInfrastructure_DNS 'deployInfrastructure_DNS.bicep' = {
 
 module deployInfrastructure_NVA 'deployInfrastructure_NVA.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployInfrastructure_NVA')}'
+  dependsOn: [
+    virtualNetworkCreate
+  ]
   params: {
     InitialDeployment: InitialDeployment
     OrganizationContext: OrganizationContext
