@@ -37,7 +37,6 @@ var WireguardArguments = join([
   '-h \'${ProjectDefinition.ipRange}\''                                                             // Home Range (the Project's IPRange)
   '-v \'${WireguardDefinition.ipRange}\''                                                           // Virtual Range (internal Wireguard IPRange)
   join(map(WireguardDefinition.islands, island => '-i \'${island}\''), ' ')                         // Island Ranges (list of Island IPRanges)
-  join(map(WireguardDefinition.devices, device => '-d \'${first(split(device, '/'))}\''), ' ')      // Device Address (list of Device IPAddress)
 ], ' ')
 
 var InitScriptBaseUri = 'https://raw.githubusercontent.com/carmada-dev/demo-organization/main/resources/project/scripts/'

@@ -266,17 +266,6 @@ resource defaultSubNetRouteGateway 'Microsoft.Network/routeTables/routes@2022-07
   }
 }
 
-module updateVirtualNetworkDns '../tools/updateVirtualNetworkDns.bicep' = if (InitialDeployment) {
-  name: '${take(deployment().name, 36)}_updateVirtualNetworkDns'
-  params: {
-    VNetName: virtualNetwork.name
-    DnsServers: [
-      InitialDeployment ? deployFirewall.outputs.FirewallPrivateIP : null
-      '168.63.129.16'
-    ]
-  }
-}
-
 resource firewall 'Microsoft.Network/azureFirewalls@2022-07-01' existing = {
   name: '${OrganizationDefinition.name}-FW'
 }

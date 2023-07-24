@@ -23,11 +23,11 @@ resource routes 'Microsoft.Network/routeTables@2022-07-01' = {
   location: OrganizationDefinition.location
 }
 
-module splitSubnets '../tools/splitSubnets.bicep' = {
+module splitSubnets '../tools/splitSubnets.bicep' = if (InitialDeployment) {
   name: '${take(deployment().name, 36)}_splitSubnets'
   params: {
     IPRange: OrganizationDefinition.ipRange
-    SubnetCount: 3
+    SubnetCount: 4
   }
 }
 
@@ -64,15 +64,17 @@ resource virtualNetworkCreate 'Microsoft.Network/virtualNetworks@2022-07-01' = i
           addressPrefix: splitSubnets.outputs.Subnets[2]
         }
       }
+      {
+        name: 'GatewaySubnet'
+        properties: {
+          addressPrefix: splitSubnets.outputs.Subnets[3]
+        }
+      }
     ]
   }  
 }
 
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
-  name: OrganizationDefinition.name
-}
-
-resource vnet 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
   name: OrganizationDefinition.name
 }
 
@@ -110,6 +112,35 @@ module deployInfrastructure_Firewall 'deployInfrastructure_Firewall.bicep' = {
     OrganizationDefinition: OrganizationDefinition
     OrganizationWorkspaceId: workspace.id
   }  
+}
+
+module deployInfrastructure_VPN 'deployInfrastructure_VPN.bicep' = if (false) {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployInfrastructure_VPN')}'
+  dependsOn: [
+    virtualNetworkCreate
+  ]
+  params: {
+    InitialDeployment: InitialDeployment
+    OrganizationDefinition: OrganizationDefinition
+    OrganizationWorkspaceId: workspace.id
+  }  
+}
+
+module updateVirtualNetworkDns '../tools/updateVirtualNetworkDns.bicep' = {
+  name: '${take(deployment().name, 36)}_updateVirtualNetworkDns'
+  dependsOn: [
+    deployInfrastructure_Bastion
+    deployInfrastructure_DNS
+    deployInfrastructure_Firewall
+    deployInfrastructure_VPN
+  ]
+  params: {
+    VNetName: virtualNetwork.name
+    DnsServers: [
+      deployInfrastructure_Firewall.outputs.GatewayIP
+      '168.63.129.16'
+    ]
+  }
 }
 
 // ============================================================================================

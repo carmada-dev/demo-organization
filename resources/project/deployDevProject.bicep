@@ -42,6 +42,7 @@ module projectAdminRoleAssignment '../tools/assignRoleOnDevProject.bicep' = {
     DevProjectName: project.name
     RoleNameOrId: 'DevCenter Project Admin'
     PrincipalIds: ProjectAdmins
+    PrincipalType: 'User'
   }
 }
 
@@ -51,6 +52,7 @@ module devBoxUserRoleAssignment '../tools/assignRoleOnDevProject.bicep' = {
     DevProjectName: project.name
     RoleNameOrId: 'DevCenter Dev Box User'
     PrincipalIds: ProjectUsers
+    PrincipalType: 'User'
   }
 }
 
@@ -60,6 +62,7 @@ module deploymentEnvironmentUserRoleAssignment '../tools/assignRoleOnDevProject.
     DevProjectName: project.name
     RoleNameOrId: 'Deployment Environments User'
     PrincipalIds: ProjectUsers
+    PrincipalType: 'User'
   }
 }
 

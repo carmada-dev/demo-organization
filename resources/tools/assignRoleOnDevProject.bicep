@@ -13,7 +13,7 @@ var BuiltInRoleDefinitions = loadJsonContent('../data/builtInRolesDefinitions.js
 
 // ============================================================================================
 
-resource resource 'Microsoft.Compute/galleries@2021-10-01' existing = {
+resource resource 'Microsoft.DevCenter/projects@2023-04-01' existing = {
   name: DevProjectName 
 }
 

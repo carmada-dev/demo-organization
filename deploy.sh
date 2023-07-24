@@ -96,7 +96,7 @@ cleanupRoleAssignmentsAndDefinitions() {
 
 }
 
-resetSubscription() {
+resetDevCenter() {
 
 	local SUBSCRIPTIONID="$1"
 
@@ -108,6 +108,11 @@ resetSubscription() {
 	for POOLID in $(az resource list --subscription $SUBSCRIPTIONID --resource-type 'Microsoft.DevCenter/projects/pools' --query [].id -o tsv | dos2unix); do
 		echo "$SUBSCRIPTIONID - Deleting devbox pool '$POOLID' ..." 
 		az devcenter admin pool delete --ids $POOLID --yes --only-show-errors &
+	done; wait 
+
+	for PROJECTENVIRONMENTTYPEID in $(az resource list --subscription $SUBSCRIPTIONID --resource-type 'Microsoft.DevCenter/projects/environmentTypes' --query [].id -o tsv | dos2unix); do
+		echo "$SUBSCRIPTIONID - Deleting project environment type '$PROJECTENVIRONMENTTYPEID' ..." 
+		az devcenter admin project-environment-type delete --ids $PROJECTENVIRONMENTTYPEID --yes --only-show-errors &
 	done; wait 
 
 	for PROJECTID in $(az resource list --subscription $SUBSCRIPTIONID --resource-type 'Microsoft.DevCenter/projects' --query [].id -o tsv | dos2unix); do
@@ -141,6 +146,13 @@ resetSubscription() {
 		done
 
 	done; wait
+}
+
+resetSubscription() {
+
+	local SUBSCRIPTIONID="$1"
+
+	cancelDeployments $SUBSCRIPTIONID
 
 	for DEVCENTERID in $(az resource list --subscription $SUBSCRIPTIONID --resource-type 'Microsoft.DevCenter/devcenters' --query [].id -o tsv | dos2unix); do
 		echo "$SUBSCRIPTIONID - Deleting dev center '$DEVCENTERID' ..." 
@@ -219,8 +231,13 @@ SUBSCRIPTION=$(cat $ORGANIZATION | jq -r .subscription)
 az account set --subscription $SUBSCRIPTION -o none && echo "Selected subscription '$(az account show --query name -o tsv | dos2unix)' ($SUBSCRIPTION) as organization home!" 
 
 if [ "$RESET" = 'true' ]; then
+
+	displayHeader "Reset DevCenter"
+	resetDevCenter $SUBSCRIPTION
+
 	displayHeader "Reset subscriptions"
 	RESETSUBSCRIPTIONS=( "$SUBSCRIPTION" )
+
 	for PROJECT in "${PROJECTS[@]}"; do
 		for RESETSUBSCRIPTION in $(cat $PROJECT | jq -r '.. | .subscription? | select(. != null)'); do
 			RESETSUBSCRIPTIONS+=( "$RESETSUBSCRIPTION" )		
@@ -231,9 +248,11 @@ if [ "$RESET" = 'true' ]; then
 			done
 		done
 	done
+
 	for RESETSUBSCRIPTION in "${RESETSUBSCRIPTIONS[@]}"; do
 		resetSubscription $RESETSUBSCRIPTION &		
 	done; wait
+
 	for RESETSUBSCRIPTION in "${RESETSUBSCRIPTIONS[@]}"; do
 		cleanupRoleAssignmentsAndDefinitions $RESETSUBSCRIPTION &
 	done; wait
