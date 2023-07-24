@@ -9,7 +9,7 @@ HRANGE=''
 VRANGE=''
 IRANGES=()
 
-while getopts 'e:h:v:i:d:' OPT; do
+while getopts 'e:h:v:i:' OPT; do
     case "$OPT" in
 		e)
 			ENDPOINT="${OPTARG}" ;;
