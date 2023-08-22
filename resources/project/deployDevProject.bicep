@@ -85,6 +85,20 @@ module deployAzureNetworkConnection 'deployDevProject_ANC.bicep' = {
   }
 }
 
+module deployDevBoxPools '../tools/deployDevBoxPools.bicep' = [for DevBox in DevBoxes: {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(DevBox), 'deployDevBoxPools')}'
+  dependsOn: [
+    deployAzureNetworkConnection
+  ]
+  params: {
+    ProjectName: project.name 
+    ProjectLocation: project.location
+    NetworkConnectionName: networkConnection.name
+    DevBoxDefinitionName: DevBox.name 
+    Pools: contains(DevBox, 'pools') ? DevBox.pools : []
+  }
+}]
+
 module deployProjectEnvironmentType 'deployDevProject_PET.bicep' = [for (EnvironmentDefinition, EnvironmentDefinitionIndex) in ProjectDefinition.environments: {
   name: '${take(deployment().name, 36)}_${uniqueString('attachEnvironmentType', string(EnvironmentDefinition))}'
   params: {
@@ -92,26 +106,11 @@ module deployProjectEnvironmentType 'deployDevProject_PET.bicep' = [for (Environ
     ProjectUsers: ProjectDefinition.users
     EnvironmentName: EnvironmentDefinition.name
     EnvironmentSubscription: EnvironmentDefinition.subscription
-    EnvironmentResourceGroupId: ProjectContext.EnvironmentContexts[EnvironmentDefinitionIndex].ResourceGroupId
-    EnvironmentNetworkId: ProjectContext.EnvironmentContexts[EnvironmentDefinitionIndex].NetworkId
+    EnvironmentResourceGroupId: ProjectContext.Environments[EnvironmentDefinitionIndex].ResourceGroupId
+    EnvironmentNetworkId: ProjectContext.Environments[EnvironmentDefinitionIndex].NetworkId
     ConfigurationStoreName: settings.name
     ConfigurationVaultName: vault.name
   }  
-}]
-
-resource devBoxPool 'Microsoft.DevCenter/projects/pools@2022-11-11-preview' = [for DevBox in DevBoxes: {
-  name: '${DevBox.name}Pool'
-  location: OrganizationDefinition.Location
-  parent: project
-  dependsOn: [
-    deployAzureNetworkConnection
-  ]
-  properties: {    
-    devBoxDefinitionName: DevBox.name
-    networkConnectionName: networkConnection.name
-    licenseType: 'Windows_Client'
-    localAdministrator: 'Enabled'
-  }
 }]
 
 resource settings 'Microsoft.AppConfiguration/configurationStores@2022-05-01' = {
@@ -146,8 +145,8 @@ resource vault 'Microsoft.KeyVault/vaults@2022-07-01' = {
   }
 }
 
-module vaultSecretUserRoleAssignment '../tools/assignRoleOnKeyVault.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'vaultSecretUserRoleAssignment')}'
+module vault_KeyVaultSecretsUser '../tools/assignRoleOnKeyVault.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(vault.id, 'vault_KeyVaultSecretsUser')}'
   params: {
     KeyVaultName: vault.name
     RoleNameOrId: 'Key Vault Secrets User'
@@ -176,3 +175,9 @@ module deploySettings '../tools/deploySettings.bicep' = {
 
 output NetworkConnectionId string = networkConnection.id
 output ProjectId string = project.id
+
+output Environments array = [for i in range(0, length(ProjectDefinition.environments)): union(ProjectContext.Environments[i], {
+  Name: ProjectDefinition.environments[i].name
+  TypeId: deployProjectEnvironmentType[i].outputs.TypeId
+  PrincipalId: deployProjectEnvironmentType[i].outputs.PrincipalId
+})]

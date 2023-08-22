@@ -75,7 +75,12 @@ module deployDevProject './deployDevProject.bicep' = [for (ProjectDefinition, Pr
       // we merge the environment contexts provided by the deploy project operation into
       // the project context to simplify context access. unfortunately this can't be done
       // using the deployProject template as part of the output generation (bicep limitations)
-      EnvironmentContexts: deployProject[ProjectDefinitionIndex].outputs.EnvironmentContexts
+      Environments: deployProject[ProjectDefinitionIndex].outputs.Environments
     })
   }
 }]
+
+// ============================================================================================
+
+output OrganizationContext object = deployDevCenter.outputs.OrganizationContext
+output ProjectContext array = [ for i in range(0, length(ProjectDefinitions)) : deployDevProject[i].outputs.ProjectContext ]

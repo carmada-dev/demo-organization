@@ -6,13 +6,16 @@ echo '==========================================================================
 
 FORWARDS=()
 BLOCKS=()
+MASQUERADES=()
 
-while getopts 'n:f:b:' OPT; do
+while getopts 'f:b:m:' OPT; do
     case "$OPT" in
 		f)
 			FORWARDS+=("${OPTARG}") ;;
 		b)
 			BLOCKS+=("${OPTARG}") ;;
+		m)
+			MASQUERADES+=("${OPTARG}") ;;
     esac
 done
 
@@ -36,10 +39,23 @@ for BLOCK in "${BLOCKS[@]}"; do
 	sudo iptables -A FORWARD -i eth0 -s $BLOCK -m state --state NEW -j REJECT
 done
 
-# ACCEPT forwarding
-for FORWARD in "${FORWARDS[@]}"; do
-	sudo iptables -A FORWARD -i eth0 -o eth0 -s $FORWARD -j ACCEPT
-	sudo iptables -t nat -A POSTROUTING -s $FORWARD -o eth0 -j MASQUERADE
-done
+if [ ${#FORWARDS[@]} -eq 0 ] && [ ${#MASQUERADES[@]} -eq 0 ]; then 
+
+	sudo iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT
+
+else 
+
+	# ACCEPT simple forwarding
+	for FORWARD in "${FORWARDS[@]}"; do
+		sudo iptables -A FORWARD -i eth0 -o eth0 -s $FORWARD -j ACCEPT
+	done
+
+	# ACCEPT forwarding with masquerade
+	for MASQUERADE in "${MASQUERADES[@]}"; do
+		sudo iptables -A FORWARD -i eth0 -o eth0 -s $MASQUERADE -j ACCEPT
+		sudo iptables -t nat -A POSTROUTING -s $MASQUERADE -o eth0 -j MASQUERADE
+	done
+
+fi
 
 sudo iptables-save > /etc/iptables/rules.v4

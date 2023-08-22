@@ -266,22 +266,25 @@ echo "Target file: $PROJECTSFILE"
 jq -s . "${PROJECTS[@]}" > $PROJECTSFILE
 
 displayHeader "Resolve principals"
-UPN=$(grep -Eom1 "\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b" $PROJECTSFILE)
+UPN=$(grep -Eom1 "\b[A-Za-z0-9._%+-]+(#EXT#)?@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b" $PROJECTSFILE)
 while [ ! -z "$UPN" ]; do
+	
 	echo "Resolving UPN '$UPN' ..."
 	OID=$(az ad user show --id $UPN --query id -o tsv | dos2unix)
 	[ -z "$OID" ] && exit 1
+
 	echo "Replacing UPN '$UPN' with OID '$OID'..."
 	sed -i "s/$UPN/$OID/" $PROJECTSFILE
-	UPN=$(grep -Eom1 "\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b" $PROJECTSFILE)
+	UPN=$(grep -Eom1 "\b[A-Za-z0-9._%+-]+(#EXT#)?@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b" $PROJECTSFILE)
+
 done
 echo '... done'
 
 displayHeader "Transpile template"
-az bicep build --file ./resources/deploy.bicep --stdout > ./deploy.json
-echo "Target file: ./deploy.json"
+az bicep build --file ./resources/deploy.bicep --stdout > ./deploy.arm.json
+echo "Target file: ./deploy.arm.json"
 
-displayHeader "Run deployment"
+displayHeader "Deploy resources"
 az deployment sub create \
 	--name $(uuidgen) \
 	--location $(jq --raw-output .location $ORGANIZATION) \
@@ -290,5 +293,46 @@ az deployment sub create \
 	--parameters \
 		OrganizationDefinition=@$ORGANIZATION \
 		ProjectDefinitions=@$PROJECTSFILE \
-		Windows365PrinicalId=$(az ad sp show --id 0af06dc6-e4b5-4f28-818e-e78e62d137a5 --query id -o tsv | dos2unix)
+		Windows365PrinicalId=$(az ad sp show --id 0af06dc6-e4b5-4f28-818e-e78e62d137a5 --query id -o tsv | dos2unix) \
+	--query properties.outputs > ./deploy.out.json 
 echo '... done'
+
+displayHeader "Granting permissions"
+MICROSOFTGRAPH_RESOURCEID=$(az ad sp list --query "[?appDisplayName=='Microsoft Graph'].id | [0]" --all -o tsv)
+APPLICATION_READWRITE_OWNEDBY_ROLEID=$(az ad sp show --id $MICROSOFTGRAPH_RESOURCEID --query "appRoles[?value=='Application.ReadWrite.OwnedBy'].id | [0]" -o tsv)
+APPLICATIONDEVELOPER_ROLEID="cf1c38e5-3621-4004-a7cb-879624dced7c"
+
+for PRINCIPALID in $(cat ./deploy.out.json | jq --raw-output '.. | .Environments? | select(. != null) | .[].PrincipalId' | dos2unix); do
+
+	echo "Managed identity '$(az ad sp show --id $PRINCIPALID --query 'displayName' -o tsv)' ($PRINCIPALID)"
+
+	# PAYLOAD=$(jq --null-input \
+	# 	--arg principalId "$PRINCIPALID" \
+	# 	--arg resourceId "$MICROSOFTGRAPH_RESOURCEID" \
+	# 	--arg appRoleId "$APPLICATION_READWRITE_OWNEDBY_ROLEID" \
+	# 	'{ "principalId": $principalId, "resourceId": $resourceId, "appRoleId": $appRoleId }')
+
+	# az rest \
+	# 	--method post \
+	# 	--url "https://graph.microsoft.com/v1.0/servicePrincipals/$PRINCIPALID/appRoleAssignedTo" \
+	# 	--headers 'Content-Type=application/json' \
+	# 	--body "$PAYLOAD" \
+	# 	--only-show-errors \
+	# 	--output none
+
+	PAYLOAD=$(jq --null-input \
+		--arg roleDefinitionId "$APPLICATIONDEVELOPER_ROLEID" \
+		--arg principalId "$PRINCIPALID" \
+		'{ "@odata.type": "#microsoft.graph.unifiedRoleAssignment", "roleDefinitionId": $roleDefinitionId, "principalId": $principalId, "directoryScopeId": "/" }')
+
+	echo "- Application Developer Role ($APPLICATIONDEVELOPER_ROLEID) ..." && az rest \
+		--method post \
+		--uri https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments \
+		--headers "{ 'content-type': 'application/json' }" \
+		--body "$PAYLOAD" \
+		--only-show-errors \
+		--output none
+
+	echo '... done'
+	
+done

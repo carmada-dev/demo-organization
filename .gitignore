@@ -1,4 +1,5 @@
 deploy.json
+deploy.*.json
 organization.json
 projects.json
 project-*.json

@@ -25,8 +25,21 @@ module deployDevProject 'project/deployDevProject.bicep' = {
   }
 }
 
+module assignRoleOnSubscription './tools/assignRoleOnSubscription.bicep' = [for EnvironmentDefinition in ProjectDefinition.environments: {
+  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnSubscription', EnvironmentDefinition.subscription)}'
+  scope: subscription(EnvironmentDefinition.subscription)
+  params: {
+    RoleNameOrId: 'Owner'
+    PrincipalIds: [
+      OrganizationContext.PrincipalId
+    ]
+  }
+}]
+
 // ============================================================================================
 
 output ProjectContext object = union(ProjectContext, {
-
+  NetworkConnectionId: deployDevProject.outputs.NetworkConnectionId
+  ProjectId: deployDevProject.outputs.ProjectId
+  Environments : deployDevProject.outputs.Environments
 })

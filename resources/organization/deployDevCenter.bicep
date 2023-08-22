@@ -16,14 +16,6 @@ var CatalogsAdoGit = filter(Catalogs, Catalog => Catalog.type == 'adoGit')
 
 // ============================================================================================
 
-resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c' // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#contributor
-}
-
-resource readerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#reader
-}
-
 resource devCenter 'Microsoft.DevCenter/devcenters@2022-11-11-preview' = {
   name: OrganizationDefinition.name
   location: OrganizationDefinition.location
@@ -180,3 +172,4 @@ resource catalogAdoGit 'Microsoft.DevCenter/devcenters/catalogs@2022-11-11-previ
 output DevCenterId string = devCenter.id
 output GalleryId string = gallery.id
 output VaultId string = vault.id
+output PrincipalId string = devCenter.identity.principalId

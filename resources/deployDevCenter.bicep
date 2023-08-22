@@ -35,4 +35,5 @@ output OrganizationContext object = union(OrganizationContext, {
   DevCenterId: deployDevCenter.outputs.DevCenterId
   GallerId: deployDevCenter.outputs.GalleryId
   VaultId: deployDevCenter.outputs.VaultId
+  PrincipalId: deployDevCenter.outputs.PrincipalId
 })

@@ -114,8 +114,8 @@ module deployInfrastructure_Firewall 'deployInfrastructure_Firewall.bicep' = {
   }  
 }
 
-module deployInfrastructure_VPN 'deployInfrastructure_VPN.bicep' = if (false) {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployInfrastructure_VPN')}'
+module deployInfrastructure_Gateway 'deployInfrastructure_Gateway.bicep' = if (false) {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'deployInfrastructure_Gateway')}'
   dependsOn: [
     virtualNetworkCreate
   ]
@@ -132,7 +132,7 @@ module updateVirtualNetworkDns '../tools/updateVirtualNetworkDns.bicep' = {
     deployInfrastructure_Bastion
     deployInfrastructure_DNS
     deployInfrastructure_Firewall
-    deployInfrastructure_VPN
+    deployInfrastructure_Gateway
   ]
   params: {
     VNetName: virtualNetwork.name

@@ -36,7 +36,7 @@ sudo apt-get install -y bind9
 # ensure bind cache folder exists
 sudo mkdir -p /var/cache/bind
 
-CLIENTS_VALUE="$(if [ ${#CLIENTS[@]} -eq 0 ]; then echo ''; else printf "%s; " "${CLIENTS[@]}"; fi)"
+CLIENTS_VALUE="$(if [ ${#CLIENTS[@]} -eq 0 ]; then echo 'any;'; else printf "%s; " "${CLIENTS[@]}"; fi)"
 FORWARDS_FULL_VALUE="$(if [ ${#FORWARDS_FULL[@]} -eq 0 ]; then echo ''; else printf "%s; " "${FORWARDS_FULL[@]}"; fi)"
 FORWARDS_ZONE_VALUE="$(if [ ${#FORWARDS_ZONE[@]} -eq 0 ]; then echo ''; else printf "%s" "${FORWARDS_ZONE[@]}"; fi)"
 

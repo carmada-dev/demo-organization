@@ -5,47 +5,36 @@ targetScope = 'resourceGroup'
 param OrganizationDefinition object
 param OrganizationContext object
 param ProjectDefinition object
+param ProjectContext object
+param EnvironmentDefinition object
 param InitialDeployment bool
 
 // ============================================================================================
 
-var ResourceName = '${ProjectDefinition.name}-GW'
+var ResourceName = '${ProjectDefinition.name}-${EnvironmentDefinition.name}'
+
+// ============================================================================================
 
 var GatewayDefinition = contains(ProjectDefinition, 'gateway') ? ProjectDefinition.gateway : {}
 var GatewayIPSegments = split(split(snet.properties.addressPrefix, '/')[0],'.')
 var GatewayIP = '${join(take(GatewayIPSegments, 3),'.')}.${int(any(last(GatewayIPSegments)))+4}'
 
-var WireguardDefinition = contains(ProjectDefinition, 'wireguard') ? ProjectDefinition.wireguard : {}
-var WireguardPort = 51820
-
-var EnvironmentPeerings = filter(vnet.properties.virtualNetworkPeerings, peer => startsWith(peer.name, 'environment-'))
-var EnvironmentAddressPrefixes = flatten(map(EnvironmentPeerings, peer => peer.properties.remoteAddressSpace.addressPrefixes))
-
 var DnsForwarderArguments = join([
-  join(map(EnvironmentAddressPrefixes, prefix => '-c \'${prefix}\''), ' ')                          // mark environment networks as valid clients
   '-f \'168.63.129.16\''                                                                            // forward request to the Azure default DNS
-  '-f \'${OrganizationContext.GatewayIP}\''                                                         // forward request to the organization DNS
+  '-f \'${ProjectContext.GatewayIP}\''                                                              // forward request to the project DNS
 ], ' ')
 
-var NetForwarderArguments = join([
-  join(map(EnvironmentAddressPrefixes, prefix => '-m \'${prefix}\''), ' ')                          // forward traffic from environment networks
-  '-b \'${OrganizationDefinition.ipRange}\''                                                        // block forward request from organization network
-], ' ')
-
-var WireguardArguments = join([
-  '-e \'${gatewayPIP.properties.ipAddress}:${WireguardPort}\''                                      // Endpoint (the Wireguard public endpoint)
-  '-h \'${ProjectDefinition.ipRange}\''                                                             // Home Range (the Project's IPRange)
-  '-v \'${WireguardDefinition.ipRange}\''                                                           // Virtual Range (internal Wireguard IPRange)
-  join(map(WireguardDefinition.islands, island => '-i \'${island}\''), ' ')                         // Island Ranges (list of Island IPRanges)
-], ' ')
+// var NetForwarderArguments = join([
+//   join(map(EnvironmentAddressPrefixes, prefix => '-f \'${prefix}\''), ' ')                          // forward traffic from environment networks
+//   '-b \'${OrganizationDefinition.ipRange}\''                                                        // block forward request from organization network
+// ], ' ')
 
 var InitScriptBaseUri = 'https://raw.githubusercontent.com/carmada-dev/demo-organization/main/resources/scripts/'
 var InitScriptNames = [ 'initMachine.sh', 'setupDnsForwarder.sh', 'setupNetForwarder.sh', 'setupWireGuard.sh' ]
 var InitCommand = join(filter([
   './initMachine.sh'
   './setupDnsForwarder.sh ${DnsForwarderArguments}'
-  './setupNetForwarder.sh ${NetForwarderArguments}'
-  './setupWireGuard.sh ${WireguardArguments}'
+  // './setupNetForwarder.sh ${NetForwarderArguments}'
   'sudo shutdown -r 1'
 ], item => !empty(item)), ' && ')
 
@@ -63,39 +52,12 @@ var DefaultRules = [
       destinationPortRange: '22'
     }
   }
-  {
-    name: 'Wireguard-Tunnel'
-    properties: {
-      priority: 2000
-      protocol: 'Udp'
-      access: 'Allow'
-      direction: 'Inbound'
-      sourceAddressPrefix: 'Internet'
-      sourcePortRange: '*'
-      destinationAddressPrefix: '*'
-      destinationPortRange: '${WireguardPort}'
-    }
-  }
 ]
-
-var IslandRules = [for i in range(1, length(WireguardDefinition.islands)): {
-  name: 'Wireguard-Island${i}'
-  properties: {
-    priority: (2000 + i)
-    protocol: '*'
-    access: 'Allow'
-    direction: 'Inbound'
-    sourceAddressPrefix: 'VirtualNetwork'
-    sourcePortRange: '*'
-    destinationAddressPrefix: WireguardDefinition.islands[i-1]
-    destinationPortRange: '*'
-  }
-}]
 
 // ============================================================================================
 
 resource vnet 'Microsoft.Network/virtualNetworks@2022-07-01' existing = {
-  name: ProjectDefinition.name
+  name: ResourceName
 }
 
 resource snet 'Microsoft.Network/virtualNetworks/subnets@2022-07-01' existing = {
@@ -103,42 +65,16 @@ resource snet 'Microsoft.Network/virtualNetworks/subnets@2022-07-01' existing = 
   parent: vnet
 }
 
-resource defaultRoutes 'Microsoft.Network/routeTables@2022-07-01' existing = {
-  name: vnet.name
-}
-
-resource defaultRoute 'Microsoft.Network/routeTables/routes@2022-07-01' = [for (island, islandIndex) in WireguardDefinition.islands : {
-  name: 'Island${islandIndex + 1}'
-  parent: defaultRoutes
-  properties: {
-    addressPrefix: island
-    nextHopType: 'VirtualAppliance'
-    nextHopIpAddress: gatewayNIC.properties.ipConfigurations[0].properties.privateIPAddress
-  }
-}]
-
-resource gatewayPIP 'Microsoft.Network/publicIPAddresses@2022-01-01' = {
-  name: ResourceName
-  location: OrganizationDefinition.location
-  sku: {
-    name: 'Standard'
-  }
-  properties: {
-    publicIPAllocationMethod: 'Static'
-    publicIPAddressVersion: 'IPv4'
-  }
-}
-
 resource gatewayNSG 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: ResourceName
+  name: '${ResourceName}-GW'
   location: OrganizationDefinition.location
   properties: {
-    securityRules: concat(DefaultRules, IslandRules)
+    securityRules: DefaultRules
   }
 }
 
 resource gatewayNIC 'Microsoft.Network/networkInterfaces@2021-05-01' = {
-  name: ResourceName
+  name: '${ResourceName}-GW'
   location: OrganizationDefinition.location
   properties: {
     ipConfigurations: [
@@ -150,9 +86,6 @@ resource gatewayNIC 'Microsoft.Network/networkInterfaces@2021-05-01' = {
           }
           privateIPAddress: GatewayIP
           privateIPAllocationMethod: 'Static'
-          publicIPAddress: {
-            id: gatewayPIP.id
-          }
         }
       }
     ]
@@ -164,7 +97,7 @@ resource gatewayNIC 'Microsoft.Network/networkInterfaces@2021-05-01' = {
 }
 
 resource availabilitySet 'Microsoft.Compute/availabilitySets@2022-08-01' = {
-  name: ResourceName
+  name: '${ResourceName}-GW'
   location: OrganizationDefinition.location
   sku: {
     name: 'Aligned'
@@ -176,7 +109,7 @@ resource availabilitySet 'Microsoft.Compute/availabilitySets@2022-08-01' = {
 }
 
 resource gateway 'Microsoft.Compute/virtualMachines@2021-11-01' = {
-  name: ResourceName
+  name: '${ResourceName}-GW'
   location: OrganizationDefinition.location
   identity: {
     type: 'SystemAssigned'

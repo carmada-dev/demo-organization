@@ -65,4 +65,4 @@ output ProjectContext object = {
   GatewayIP: projectInfrastructure.outputs.GatewayIP
 }
 
-output EnvironmentContexts array = [for i in range(0, length(ProjectDefinition.environments)): deployProjectEnvironment[i].outputs.EnvironmentContext]
+output Environments array = [for i in range(0, length(ProjectDefinition.environments)): deployProjectEnvironment[i].outputs.EnvironmentContext]

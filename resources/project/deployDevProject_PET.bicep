@@ -30,19 +30,29 @@ var RoleDefinitionId = {
   Reader: 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 }
 
-var creatorRoleAssignment = {
+var EnvironmentTypeCreatorRoleAssignment = {
   roles: {
     '${RoleDefinitionId.Contributor}': {}
   }
 }
 
-var userRoleAssignments = map(ProjectUsers, usr => {
+var EnvironmentTypeUserRoleAssignments = map(ProjectUsers, usr => {
   '${usr}': {
     roles: {
       '${RoleDefinitionId.Reader}': {}
     }
   }
 })
+
+var EnvironmentTypeRolesOnConfigurationStore = [
+  'Reader'
+  'App Configuration Data Reader'
+]
+
+var EnvironmentTypeRolesOnConfigurationVault = [
+  'Reader'
+  'Key Vault Secrets User'
+]
 
 // ============================================================================================
 
@@ -72,8 +82,8 @@ resource environmentType 'Microsoft.DevCenter/projects/environmentTypes@2022-11-
   properties: {
     deploymentTargetId: startsWith(EnvironmentSubscription, '/') ? EnvironmentSubscription : '/subscriptions/${EnvironmentSubscription}'
     status: 'Enabled'
-    creatorRoleAssignment: creatorRoleAssignment
-    userRoleAssignments: reduce(userRoleAssignments, {}, (cur, next) => union(cur, next))
+    creatorRoleAssignment: EnvironmentTypeCreatorRoleAssignment
+    userRoleAssignments: reduce(EnvironmentTypeUserRoleAssignments, {}, (cur, next) => union(cur, next))
   }
 }
 
@@ -81,8 +91,8 @@ module deploySettings '../tools/deploySettings.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString('deploySettings', EnvironmentName)}'
   scope: resourceGroup()
   params: {
-    ConfigurationStoreName: ConfigurationStoreName
-    ConfigurationVaultName: ConfigurationVaultName
+    ConfigurationStoreName: configurationStore.name
+    ConfigurationVaultName: configurationVault.name
     Label: EnvironmentName
     ReaderPrincipalIds: [
       environmentType.identity.principalId
@@ -97,6 +107,8 @@ module deploySettings '../tools/deploySettings.bicep' = {
   }
 }
 
+// Grant EnvironmentType identity permissions on the project's PrivateLink resource group
+// to support private link creation as part of environment deployments.
 module assignRoleOnResourceGroup_PrivateLink '../tools/assignRoleOnResourceGroup.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnResourceGroup_PrivateLink', environmentType.id)}'
   scope: resourceGroup('${resourceGroup().name}-PL')
@@ -108,6 +120,47 @@ module assignRoleOnResourceGroup_PrivateLink '../tools/assignRoleOnResourceGroup
   }
 }
 
+// Grant EnvironmentType identity permissions on the project's network to enable PrivateLink
+// registrations if they are created during an environment deployment.
+module assignRoleOnVirtualNetwork_PrivateLink '../tools/assignRoleOnVirtualNetwork.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnVirtualNetwork_PrivateLink', environmentType.id)}'
+  params: {
+    VirtualNetworkName: ProjectName
+    RoleNameOrId: 'Contributor'
+    PrincipalIds: [
+      environmentType.identity.principalId
+    ]
+  }
+}
+
+// Grant EnvironmentType identity permissions on the projects configuration store to
+// read project specific configuration values during environment deployments.
+module assingRoleOnAppConfiguration_ConfigurationStore '../tools/assignRoleOnAppConfiguration.bicep' = [for role in EnvironmentTypeRolesOnConfigurationStore: {
+  name: '${take(deployment().name, 36)}_${uniqueString('assingRoleOnAppConfiguration_ConfigurationStore', environmentType.id, role)}'
+  params: {
+    AppConfigurationName: configurationStore.name
+    RoleNameOrId: role
+    PrincipalIds: [ 
+      environmentType.identity.principalId 
+    ]
+  }
+}]
+
+// Grant EnvironmentType identity permissions on the projects configuration vault to
+// read project specific configuration secrets during environment deployments.
+module assignRoleOnKeyVault_ConfigurationVault '../tools/assignRoleOnKeyVault.bicep' = [for role in EnvironmentTypeRolesOnConfigurationVault: {
+  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnKeyVault_ConfigurationVault', environmentType.id, role)}'
+  params: {
+    KeyVaultName: configurationVault.name
+    RoleNameOrId: role
+    PrincipalIds: [ 
+      environmentType.identity.principalId 
+    ]
+  }
+}]
+
+// Grant EnvironmentType identity permissions on the environment resource group
+// to modify resources during environment deployments.
 module assignRoleOnResourceGroup_Environment '../tools/assignRoleOnResourceGroup.bicep' = {
   name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnResourceGroup_Environment', environmentType.id)}'
   scope: resourceGroup(split(EnvironmentResourceGroupId, '/')[2], split(EnvironmentResourceGroupId, '/')[4])
@@ -119,17 +172,7 @@ module assignRoleOnResourceGroup_Environment '../tools/assignRoleOnResourceGroup
   }
 }
 
-module assignRoleOnVirtualNetwork '../tools/assignRoleOnVirtualNetwork.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnVirtualNetwork', environmentType.id)}'
-  params: {
-    VirtualNetworkName: ProjectName
-    RoleNameOrId: 'Contributor'
-    PrincipalIds: [
-      environmentType.identity.principalId
-    ]
-  }
-}
-
 // ============================================================================================
 
-output EnvironmentTypePrincipalId string = environmentType.identity.principalId
+output TypeId string = environmentType.id
+output PrincipalId string = environmentType.identity.principalId
