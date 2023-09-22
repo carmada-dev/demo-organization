@@ -10,10 +10,6 @@ param EnvironmentName string
 
 param EnvironmentSubscription string
 
-param EnvironmentResourceGroupId string
-
-param EnvironmentNetworkId string
-
 param EnvironmentTags object = {}
 
 param ConfigurationStoreName string
@@ -98,19 +94,16 @@ module deploySettings '../tools/deploySettings.bicep' = {
       environmentType.identity.principalId
     ]
     Settings: {
-      EnvironmentNetworkId: EnvironmentNetworkId
-      EnvironmentResourceGroupId: EnvironmentResourceGroupId
     }
     Secrets: {
-
     }
   }
 }
 
 // Grant EnvironmentType identity permissions on the project's PrivateLink resource group
-// to support private link creation as part of environment deployments.
-module assignRoleOnResourceGroup_PrivateLink '../tools/assignRoleOnResourceGroup.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnResourceGroup_PrivateLink', environmentType.id)}'
+// to support private DNS zone creation as part of environment deployments.
+module assignRoleOnResourceGroup_PrivateLink_Contributor '../tools/assignRoleOnResourceGroup.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnResourceGroup_PrivateLink_Contributor', environmentType.id)}'
   scope: resourceGroup('${resourceGroup().name}-PL')
   params: {
     RoleNameOrId: 'Contributor'
@@ -119,6 +112,20 @@ module assignRoleOnResourceGroup_PrivateLink '../tools/assignRoleOnResourceGroup
     ]
   }
 }
+
+// Grant EnvironmentType identity permissions on the project's PrivateLink resource group
+// to support private DNS zone linking as part of environment deployments.
+module assignRoleOnResourceGroup_PrivateLink_PrivateDNSZoneContributor '../tools/assignRoleOnResourceGroup.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnResourceGroup_PrivateLink_PrivateDNSZoneContributor', environmentType.id)}'
+  scope: resourceGroup('${resourceGroup().name}-PL')
+  params: {
+    RoleNameOrId: 'Private DNS Zone Contributor'
+    PrincipalIds: [
+      environmentType.identity.principalId
+    ]
+  }
+}
+
 
 // Grant EnvironmentType identity permissions on the project's network to enable PrivateLink
 // registrations if they are created during an environment deployment.
@@ -158,19 +165,6 @@ module assignRoleOnKeyVault_ConfigurationVault '../tools/assignRoleOnKeyVault.bi
     ]
   }
 }]
-
-// Grant EnvironmentType identity permissions on the environment resource group
-// to modify resources during environment deployments.
-module assignRoleOnResourceGroup_Environment '../tools/assignRoleOnResourceGroup.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString('assignRoleOnResourceGroup_Environment', environmentType.id)}'
-  scope: resourceGroup(split(EnvironmentResourceGroupId, '/')[2], split(EnvironmentResourceGroupId, '/')[4])
-  params: {
-    RoleNameOrId: 'Contributor'
-    PrincipalIds: [
-      environmentType.identity.principalId
-    ]
-  }
-}
 
 // ============================================================================================
 

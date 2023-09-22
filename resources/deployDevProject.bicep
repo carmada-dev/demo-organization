@@ -2,11 +2,11 @@ targetScope = 'subscription'
 
 // ============================================================================================
 
-param DeploymentContext object
 param OrganizationDefinition object
 param OrganizationContext object
 param ProjectDefinition object
 param ProjectContext object
+param DeploymentContext object
 
 // ============================================================================================
 
@@ -22,6 +22,7 @@ module deployDevProject 'project/deployDevProject.bicep' = {
     OrganizationContext: OrganizationContext
     ProjectDefinition: ProjectDefinition
     ProjectContext: ProjectContext
+    DeploymentContext: DeploymentContext
   }
 }
 

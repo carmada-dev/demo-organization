@@ -17,7 +17,7 @@ var ResourceLocation = resourceGroup().location
 
 resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = if (SubnetCount > 1) {
   #disable-next-line use-stable-resource-identifiers
-  name: 'SplitSubnets-${guid(IPRange, string(SubnetCount), OperationId)}'
+  name: 'SplitSubnets-${guid(OperationId)}'
   location: ResourceLocation
   kind: 'AzureCLI'
   properties: {

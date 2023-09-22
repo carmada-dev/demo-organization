@@ -12,8 +12,9 @@ param InitialDeployment bool
 var ResourceName = '${ProjectDefinition.name}-GW'
 
 var GatewayDefinition = contains(ProjectDefinition, 'gateway') ? ProjectDefinition.gateway : {}
-var GatewayIPSegments = split(split(snet.properties.addressPrefix, '/')[0],'.')
-var GatewayIP = '${join(take(GatewayIPSegments, 3),'.')}.${int(any(last(GatewayIPSegments)))+4}'
+// var GatewayIPSegments = split(split(snet.properties.addressPrefix, '/')[0],'.')
+// var GatewayIP = '${join(take(GatewayIPSegments, 3),'.')}.${int(any(last(GatewayIPSegments)))+4}'
+var GatewayIP = cidrHost(snet.properties.addressPrefix, 3)
 
 var WireguardDefinition = contains(ProjectDefinition, 'wireguard') ? ProjectDefinition.wireguard : {}
 var WireguardPort = 51820
@@ -105,6 +106,14 @@ resource snet 'Microsoft.Network/virtualNetworks/subnets@2022-07-01' existing = 
 
 resource defaultRoutes 'Microsoft.Network/routeTables@2022-07-01' existing = {
   name: vnet.name
+}
+
+resource settingsStore 'Microsoft.AppConfiguration/configurationStores@2022-05-01' existing = {
+  name: ProjectDefinition.name
+}
+
+resource settingsVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
+  name: ProjectDefinition.name
 }
 
 resource defaultRoute 'Microsoft.Network/routeTables/routes@2022-07-01' = [for (island, islandIndex) in WireguardDefinition.islands : {
@@ -232,6 +241,18 @@ resource gatewayInit 'Microsoft.Compute/virtualMachines/extensions@2022-08-01' =
     settings: {      
       fileUris: map(InitScriptNames, name => uri(InitScriptBaseUri, name))
       commandToExecute: InitCommand
+    }
+  }
+}
+
+module deploySettings '../tools/deploySettings.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(deployment().name)}'
+  scope: resourceGroup()
+  params: {
+    ConfigurationStoreName: settingsStore.name
+    ConfigurationVaultName: settingsVault.name
+    Settings: {
+      ProjectGatewayIP: gatewayNIC.properties.ipConfigurations[0].properties.privateIPAddress
     }
   }
 }

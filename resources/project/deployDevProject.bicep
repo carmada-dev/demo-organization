@@ -6,6 +6,7 @@ param OrganizationDefinition object
 param OrganizationContext object
 param ProjectDefinition object
 param ProjectContext object
+param DeploymentContext object
 
 // ============================================================================================
 
@@ -13,9 +14,6 @@ var DevBoxes = contains(OrganizationDefinition, 'devboxes') ? OrganizationDefini
 
 var ProjectAdmins = contains(ProjectDefinition, 'admins') ? ProjectDefinition.admins : []
 var ProjectUsers = contains(ProjectDefinition, 'users') ? ProjectDefinition.users : []
-
-var ProjectSettings = contains(ProjectDefinition, 'settings') ? ProjectDefinition.settings : {}
-var ProjectSecrets = contains(ProjectDefinition, 'secrets') ? ProjectDefinition.secrets : {}
 
 // ============================================================================================
 
@@ -28,11 +26,32 @@ resource defaultSubnet 'Microsoft.Network/virtualNetworks/subnets@2022-07-01' ex
   parent: virtualNetwork
 }
 
+resource settingsStore 'Microsoft.AppConfiguration/configurationStores@2022-05-01' existing = {
+  name: ProjectDefinition.name
+}
+
+resource settingsVault 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
+  name: ProjectDefinition.name
+}
+
 resource project 'Microsoft.DevCenter/projects@2022-11-11-preview' = {
   name: ProjectDefinition.name
   location: OrganizationDefinition.location
   properties: {
     devCenterId: OrganizationContext.DevCenterId
+  }
+}
+
+module deployDevProject_SVC 'deployDevProject_SVC.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(ProjectDefinition), 'deployDevProject_SVC')}'
+  dependsOn: [
+    project
+  ]
+  params: {
+    OrganizationContext: OrganizationContext
+    OrganizationDefinition: OrganizationDefinition
+    ProjectDefinition: ProjectDefinition
+    ProjectContext: ProjectContext
   }
 }
 
@@ -106,68 +125,44 @@ module deployProjectEnvironmentType 'deployDevProject_PET.bicep' = [for (Environ
     ProjectUsers: ProjectDefinition.users
     EnvironmentName: EnvironmentDefinition.name
     EnvironmentSubscription: EnvironmentDefinition.subscription
-    EnvironmentResourceGroupId: ProjectContext.Environments[EnvironmentDefinitionIndex].ResourceGroupId
-    EnvironmentNetworkId: ProjectContext.Environments[EnvironmentDefinitionIndex].NetworkId
-    ConfigurationStoreName: settings.name
-    ConfigurationVaultName: vault.name
+    ConfigurationStoreName: settingsStore.name
+    ConfigurationVaultName: settingsVault.name
   }  
 }]
 
-resource settings 'Microsoft.AppConfiguration/configurationStores@2022-05-01' = {
+resource gallery 'Microsoft.Compute/galleries@2021-10-01' = {
   name: ProjectDefinition.name
   location: OrganizationDefinition.location
-  sku: {
-    name: 'standard'
-  }
-  identity: {
-    type: 'SystemAssigned'   
-  }
-  properties: {
-    // disableLocalAuth: true
-    publicNetworkAccess: 'Enabled'
-  }
 }
 
-resource vault 'Microsoft.KeyVault/vaults@2022-07-01' = {
-  name: ProjectDefinition.name
-  location: OrganizationDefinition.location
-  properties: {
-    tenantId: subscription().tenantId
-    enableRbacAuthorization: true
-    sku: {
-      name: 'standard'
-      family: 'A'
-    }
-    networkAcls: {
-      defaultAction: 'Allow'
-      bypass: 'AzureServices'
-    }
-  }
-}
-
-module vault_KeyVaultSecretsUser '../tools/assignRoleOnKeyVault.bicep' = {
-  name: '${take(deployment().name, 36)}_${uniqueString(vault.id, 'vault_KeyVaultSecretsUser')}'
+module galleryContributorRoleAssignment '../tools/assignRoleOnComputeGallery.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'galleryContributorRoleAssignment')}'
   params: {
-    KeyVaultName: vault.name
-    RoleNameOrId: 'Key Vault Secrets User'
-    PrincipalIds: [ settings.identity.principalId ]
+    ComputeGalleryName: gallery.name
+    RoleNameOrId: 'Contributor'
+    PrincipalIds: [ OrganizationContext.PrincipalId ]
   }
 }
 
-module deploySettings '../tools/deploySettings.bicep' = {
-  name: '${take(deployment().name, 36)}_deploySettings'
-  scope: resourceGroup()
+module galleryReaderRoleAssignment '../tools/assignRoleOnComputeGallery.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(string(OrganizationDefinition), 'galleryReaderRoleAssignment')}'
   params: {
-    ConfigurationStoreName: settings.name
-    ConfigurationVaultName: vault.name
-    Settings: union(ProjectSettings, {
-      ProjectNetworkName: virtualNetwork.name
-      ProjectNetworkId: virtualNetwork.id
-      PrivateLinkDnsZoneRG: '${resourceGroup().id}-PL'
-    })
-    Secrets: union(ProjectSecrets, {
+    ComputeGalleryName: gallery.name
+    RoleNameOrId: 'Reader'
+    PrincipalIds: [ DeploymentContext.Windows365PrinicalId ]
+  }
+}
 
-    })
+module attachGallery '../tools/deployGalleryRegistration.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(gallery.id, 'galleryReaderRoleAssignment')}'
+  scope: resourceGroup(split(OrganizationContext.DevCenterId, '/')[2], split(OrganizationContext.DevCenterId, '/')[4])
+  dependsOn: [
+    galleryContributorRoleAssignment
+    galleryReaderRoleAssignment
+  ]
+  params: {
+    DevCenterName: last(split(OrganizationContext.DevCenterId, '/'))
+    GalleryId: gallery.id
   }
 }
 
@@ -176,8 +171,8 @@ module deploySettings '../tools/deploySettings.bicep' = {
 output NetworkConnectionId string = networkConnection.id
 output ProjectId string = project.id
 
-output Environments array = [for i in range(0, length(ProjectDefinition.environments)): union(ProjectContext.Environments[i], {
+output Environments array = [for i in range(0, length(ProjectDefinition.environments)): {
   Name: ProjectDefinition.environments[i].name
   TypeId: deployProjectEnvironmentType[i].outputs.TypeId
   PrincipalId: deployProjectEnvironmentType[i].outputs.PrincipalId
-})]
+}]

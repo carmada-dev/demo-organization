@@ -94,16 +94,15 @@ module galleryReaderRoleAssignment '../tools/assignRoleOnComputeGallery.bicep' =
   }
 }
 
-resource attachGallery 'Microsoft.DevCenter/devcenters/galleries@2022-11-11-preview' = {
-  name: gallery.name
-  parent: devCenter
+module attachGallery '../tools/deployGalleryRegistration.bicep' = {
+  name: '${take(deployment().name, 36)}_${uniqueString(gallery.id, 'galleryReaderRoleAssignment')}'
   dependsOn: [
     galleryContributorRoleAssignment
     galleryReaderRoleAssignment
   ]
-  properties: {
-    #disable-next-line use-resource-id-functions
-    galleryResourceId: gallery.id
+  params: {
+    DevCenterName: devCenter.name
+    GalleryId: gallery.id
   }
 }
 

@@ -39,24 +39,6 @@ module projectInfrastructure 'project/deployInfrastructure.bicep' = {
   }
 }
 
-module deployProjectEnvironment './deployProjectEnvironment.bicep' = [for EnvironmentDefinition in ProjectDefinition.environments: {
-  name: '${take(deployment().name, 36)}_${uniqueString(string(EnvironmentDefinition))}'
-  scope: subscription(EnvironmentDefinition.subscription)
-  params: {
-    OrganizationDefinition: OrganizationDefinition
-    OrganizationContext: OrganizationContext
-    ProjectDefinition: ProjectDefinition
-    ProjectContext: {
-      // CAUTION !!! This is a temporary project context
-      // and not necessarily the context we return as
-      // an output value of this template !!!
-      NetworkId: projectInfrastructure.outputs.NetworkId
-      GatewayIP: projectInfrastructure.outputs.GatewayIP      
-    }
-    EnvironmentDefinition: EnvironmentDefinition
-  }
-}]
-
 // ============================================================================================
 
 output ProjectContext object = {
@@ -64,5 +46,3 @@ output ProjectContext object = {
   NetworkId: projectInfrastructure.outputs.NetworkId
   GatewayIP: projectInfrastructure.outputs.GatewayIP
 }
-
-output Environments array = [for i in range(0, length(ProjectDefinition.environments)): deployProjectEnvironment[i].outputs.EnvironmentContext]

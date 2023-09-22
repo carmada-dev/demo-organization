@@ -297,42 +297,72 @@ az deployment sub create \
 	--query properties.outputs > ./deploy.out.json 
 echo '... done'
 
-displayHeader "Granting permissions"
-MICROSOFTGRAPH_RESOURCEID=$(az ad sp list --query "[?appDisplayName=='Microsoft Graph'].id | [0]" --all -o tsv)
-APPLICATION_READWRITE_OWNEDBY_ROLEID=$(az ad sp show --id $MICROSOFTGRAPH_RESOURCEID --query "appRoles[?value=='Application.ReadWrite.OwnedBy'].id | [0]" -o tsv)
-APPLICATIONDEVELOPER_ROLEID="cf1c38e5-3621-4004-a7cb-879624dced7c"
+# displayHeader "Granting permissions"
+# GRAPH_RESOURCEID=$(az ad sp list --query "[?appDisplayName=='Microsoft Graph'].id | [0]" --all -o tsv)
+# GRAPH_APPLICATION_READWRITE_OWNEDBY_ROLEID=$(az ad sp show --id $GRAPH_RESOURCEID --query "appRoles[?value=='Application.ReadWrite.OwnedBy'].id | [0]" -o tsv)
+# GRAPH_APPLICATION_READWRITE_ALL_ROLEID=$(az ad sp show --id $GRAPH_RESOURCEID --query "appRoles[?value=='Application.ReadWrite.All'].id | [0]" -o tsv)
 
-for PRINCIPALID in $(cat ./deploy.out.json | jq --raw-output '.. | .Environments? | select(. != null) | .[].PrincipalId' | dos2unix); do
+# USER_APPLICATIONDEVELOPER_ROLEID='cf1c38e5-3621-4004-a7cb-879624dced7c'
+# USER_APPLICATIONADMINISTRATOR_ROLEID='158c047a-c907-4556-b7ef-446551a6b5f7'
 
-	echo "Managed identity '$(az ad sp show --id $PRINCIPALID --query 'displayName' -o tsv)' ($PRINCIPALID)"
+# for PRINCIPALID in $(cat ./deploy.out.json | jq --raw-output '.. | .Environments? | select(. != null) | .[].PrincipalId' | dos2unix); do
 
-	# PAYLOAD=$(jq --null-input \
-	# 	--arg principalId "$PRINCIPALID" \
-	# 	--arg resourceId "$MICROSOFTGRAPH_RESOURCEID" \
-	# 	--arg appRoleId "$APPLICATION_READWRITE_OWNEDBY_ROLEID" \
-	# 	'{ "principalId": $principalId, "resourceId": $resourceId, "appRoleId": $appRoleId }')
+# 	echo "Managed identity '$(az ad sp show --id $PRINCIPALID --query 'displayName' -o tsv)' ($PRINCIPALID)"
 
-	# az rest \
-	# 	--method post \
-	# 	--url "https://graph.microsoft.com/v1.0/servicePrincipals/$PRINCIPALID/appRoleAssignedTo" \
-	# 	--headers 'Content-Type=application/json' \
-	# 	--body "$PAYLOAD" \
-	# 	--only-show-errors \
-	# 	--output none
+# 	PAYLOAD=$(jq --null-input \
+# 		--arg roleDefinitionId "$USER_APPLICATIONDEVELOPER_ROLEID" \
+# 		--arg principalId "$PRINCIPALID" \
+# 		'{ "@odata.type": "#microsoft.graph.unifiedRoleAssignment", "roleDefinitionId": $roleDefinitionId, "principalId": $principalId, "directoryScopeId": "/" }')
 
-	PAYLOAD=$(jq --null-input \
-		--arg roleDefinitionId "$APPLICATIONDEVELOPER_ROLEID" \
-		--arg principalId "$PRINCIPALID" \
-		'{ "@odata.type": "#microsoft.graph.unifiedRoleAssignment", "roleDefinitionId": $roleDefinitionId, "principalId": $principalId, "directoryScopeId": "/" }')
+# 	echo "- Application Developer Role ($USER_APPLICATIONDEVELOPER_ROLEID) ..." && az rest \
+# 		--method post \
+# 		--uri https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments \
+# 		--headers "{ 'content-type': 'application/json' }" \
+# 		--body "$PAYLOAD" \
+# 		--only-show-errors \
+# 		--output none
 
-	echo "- Application Developer Role ($APPLICATIONDEVELOPER_ROLEID) ..." && az rest \
-		--method post \
-		--uri https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments \
-		--headers "{ 'content-type': 'application/json' }" \
-		--body "$PAYLOAD" \
-		--only-show-errors \
-		--output none
+# 	PAYLOAD=$(jq --null-input \
+# 		--arg roleDefinitionId "$USER_APPLICATIONADMINISTRATOR_ROLEID" \
+# 		--arg principalId "$PRINCIPALID" \
+# 		'{ "@odata.type": "#microsoft.graph.unifiedRoleAssignment", "roleDefinitionId": $roleDefinitionId, "principalId": $principalId, "directoryScopeId": "/" }')
 
-	echo '... done'
+# 	echo "- Application Administrator Role ($USER_APPLICATIONADMINISTRATOR_ROLEID) ..." && az rest \
+# 		--method post \
+# 		--uri https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments \
+# 		--headers "{ 'content-type': 'application/json' }" \
+# 		--body "$PAYLOAD" \
+# 		--only-show-errors \
+# 		--output none
+
+# 	PAYLOAD=$(jq --null-input \
+# 		--arg principalId "$PRINCIPALID" \
+# 		--arg resourceId "$GRAPH_RESOURCEID" \
+# 		--arg appRoleId "$GRAPH_APPLICATION_READWRITE_OWNEDBY_ROLEID" \
+# 		'{ "principalId": $principalId, "resourceId": $resourceId, "appRoleId": $appRoleId }')
+
+# 	echo "- Application Read/Write OwnedBy ($GRAPH_APPLICATION_READWRITE_OWNEDBY_ROLEID) ..." && az rest \
+# 		--method post \
+# 		--url "https://graph.microsoft.com/v1.0/servicePrincipals/$PRINCIPALID/appRoleAssignedTo" \
+# 		--headers 'Content-Type=application/json' \
+# 		--body "$PAYLOAD" \
+# 		--only-show-errors \
+# 		--output none
+
+# 	PAYLOAD=$(jq --null-input \
+# 		--arg principalId "$PRINCIPALID" \
+# 		--arg resourceId "$GRAPH_RESOURCEID" \
+# 		--arg appRoleId "$GRAPH_APPLICATION_READWRITE_ALL_ROLEID" \
+# 		'{ "principalId": $principalId, "resourceId": $resourceId, "appRoleId": $appRoleId }')
+
+# 	echo "- Application Read/Write ALL ($GRAPH_APPLICATION_READWRITE_ALL_ROLEID) ..." && az rest \
+# 		--method post \
+# 		--url "https://graph.microsoft.com/v1.0/servicePrincipals/$PRINCIPALID/appRoleAssignedTo" \
+# 		--headers 'Content-Type=application/json' \
+# 		--body "$PAYLOAD" \
+# 		--only-show-errors \
+# 		--output none
+
+# 	echo '... done'
 	
-done
+# done

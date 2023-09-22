@@ -27,6 +27,7 @@ resource readerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2022-04-0
 
 resource readerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroup().id, readerRoleDefinition.id, identity.id)
+  scope: resourceGroup()
   properties: {
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
@@ -36,7 +37,7 @@ resource readerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 
 resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   #disable-next-line use-stable-resource-identifiers
-  name: 'ResourceExists-${guid(ResourceId, OperationId)}'
+  name: 'ResourceExists-${guid(OperationId)}'
   location: ResourceLocation
   identity: {
     type: 'UserAssigned'
