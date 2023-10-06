@@ -12,24 +12,23 @@ param InitialDeployment bool
 var ResourceName = '${ProjectDefinition.name}-GW'
 
 var GatewayDefinition = contains(ProjectDefinition, 'gateway') ? ProjectDefinition.gateway : {}
-// var GatewayIPSegments = split(split(snet.properties.addressPrefix, '/')[0],'.')
-// var GatewayIP = '${join(take(GatewayIPSegments, 3),'.')}.${int(any(last(GatewayIPSegments)))+4}'
 var GatewayIP = cidrHost(snet.properties.addressPrefix, 3)
 
-var WireguardDefinition = contains(ProjectDefinition, 'wireguard') ? ProjectDefinition.wireguard : {}
+var WireguardDefinition = contains(GatewayDefinition, 'wireguard') ? GatewayDefinition.wireguard : {}
 var WireguardPort = 51820
 
-var EnvironmentPeerings = filter(vnet.properties.virtualNetworkPeerings, peer => startsWith(peer.name, 'environment-'))
-var EnvironmentAddressPrefixes = flatten(map(EnvironmentPeerings, peer => peer.properties.remoteAddressSpace.addressPrefixes))
+var EnvironmentDefinitions = contains(ProjectDefinition, 'environments') ? ProjectDefinition.environments : []
+var EnvironmentPools = union(filter(flatten(map(EnvironmentDefinitions, ed => contains(ed, 'ipPools') ? ed.ipPools : [])), pool => !startsWith(pool, '!')), [])
+
 
 var DnsForwarderArguments = join([
-  join(map(EnvironmentAddressPrefixes, prefix => '-c \'${prefix}\''), ' ')                          // mark environment networks as valid clients
+  join(map(EnvironmentPools, pool => '-c \'${pool}\''), ' ')                                        // mark environment networks as valid clients
   '-f \'168.63.129.16\''                                                                            // forward request to the Azure default DNS
   '-f \'${OrganizationContext.GatewayIP}\''                                                         // forward request to the organization DNS
 ], ' ')
 
 var NetForwarderArguments = join([
-  join(map(EnvironmentAddressPrefixes, prefix => '-m \'${prefix}\''), ' ')                          // forward traffic from environment networks
+  join(map(EnvironmentPools, pool => '-m \'${pool}\''), ' ')                                        // forward & masqurade traffic from environment networks
   '-b \'${OrganizationDefinition.ipRange}\''                                                        // block forward request from organization network
 ], ' ')
 
